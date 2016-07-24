@@ -8,6 +8,8 @@
  * @license    MIT License
  */
 
+var dispatchMutation = require("./lib/dispatch-mutation");
+var MutationObserver = require("./lib/mutation-observer");
 
 // Void elements: http://www.w3.org/html/wg/drafts/html/master/syntax.html#void-elements
 var voidElements = {
@@ -158,6 +160,14 @@ var voidElements = {
 			childs.splice(ref ? childs.indexOf(ref) : childs.length, 0, el)
 			// TODO:2015-07-24:lauri:update document.body and document.documentElement
 		}
+
+    dispatchMutation(this, {
+      type: "childList",
+      addedNodes: [el],
+      removedNodes: [],
+      target: this
+    })
+
 		return el
 	},
 	removeChild: function(el) {
@@ -167,7 +177,15 @@ var voidElements = {
 
 		node.childNodes.splice(index, 1)
 		el.parentNode = null
-		return el
+
+		dispatchMutation(this, {
+      type: "childList",
+      addedNodes: [],
+      removedNodes: [el],
+      target: this
+    })
+
+    return el
 	},
 	replaceChild: function(el, ref) {
 		this.insertBefore(el, ref)
@@ -316,11 +334,23 @@ extendNode(HTMLElement, elementGetters, {
 	},
 	setAttribute: function(name, value) {
 		this[escapeAttributeName(name)] = "" + value
+
+		dispatchMutation(this, {
+      type: "attributes",
+      attributeName: name,
+      target: this
+    })
 	},
 	removeAttribute: function(name) {
 		name = escapeAttributeName(name)
 		this[name] = ""
 		delete this[name]
+
+		dispatchMutation(this, {
+      type: "attributes",
+      attributeName: name,
+      target: this
+    })
 	},
 	toString: function() {
 		var attrs = this.attributes.join(" ")
@@ -410,6 +440,7 @@ module.exports = {
 	StyleMap: StyleMap,
 	Node: Node,
 	HTMLElement: HTMLElement,
-	Document: Document
+	Document: Document,
+	MutationObserver: MutationObserver
 }
 

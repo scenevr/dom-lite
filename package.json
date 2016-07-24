@@ -23,6 +23,7 @@
     "url": "https://github.com/litejs/dom-lite/issues"
   },
   "dependencies": {
+    "lodash.debounce": "^4.0.6",
     "selector-lite": "0.1.*"
   },
   "devDependencies": {
