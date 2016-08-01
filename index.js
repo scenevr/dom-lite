@@ -10,6 +10,12 @@
 
 var dispatchMutation = require("./lib/dispatch-mutation");
 var MutationObserver = require("./lib/mutation-observer");
+var EventEmitter = require('events').EventEmitter;
+
+function makeEmitter (element) {
+  EventEmitter.call(element);
+  // Object.assign(element, EventEmitter.prototype);
+}
 
 // Void elements: http://www.w3.org/html/wg/drafts/html/master/syntax.html#void-elements
 var voidElements = {
@@ -311,6 +317,7 @@ function HTMLElement(tag) {
 	element.localName = tag.toLowerCase()
 	element.childNodes = []
 	element.attributeMap = {}
+	makeEmitter(element);
 }
 
 function mappedAttribute (name) {
@@ -334,6 +341,11 @@ extendNode(HTMLElement, elementGetters, {
 	},
 	closest: function(sel) {
 		return selector.closest(this, sel)
+	},
+	addEventListener: EventEmitter.prototype.addListener,
+	classList: { 
+		add: function () {},
+		remove: function () {}
 	},
 	namespaceURI: "http://www.w3.org/1999/xhtml",
 	nodeType: 1,
@@ -375,6 +387,10 @@ extendNode(HTMLElement, elementGetters, {
 	setAttribute: function(name, value) {
 		this.attributeMap[escapeAttributeName(name)] = "" + value
 
+		if (mappedAttribute(escapeAttributeName(name))) {
+			this[escapeAttributeName(name)] = "" + value
+		}
+
 		dispatchMutation(this, {
       type: "attributes",
       attributeName: name,
@@ -409,6 +425,7 @@ function ElementNS(namespace, tag) {
 	element.nodeName = element.tagName = element.localName = tag
 	element.childNodes = []
 	element.attributeMap = {}
+	makeEmitter(element);
 }
 
 ElementNS.prototype = HTMLElement.prototype
@@ -453,8 +470,11 @@ extendNode(DocumentType, {
 	}
 })
 
+var registeredElements = {};
+
 function Document() {
 	this.childNodes = []
+  makeEmitter(this);
 	this.documentElement = this.createElement("html")
 	this.appendChild(this.documentElement)
 	this.body = this.createElement("body")
@@ -472,7 +492,35 @@ function own(Element) {
 extendNode(Document, elementGetters, {
 	nodeType: 9,
 	nodeName: "#document",
-	createElement: own(HTMLElement),
+	addEventListener: EventEmitter.prototype.addListener,
+	on: EventEmitter.prototype.addListener,
+	emit: EventEmitter.prototype.emit,
+	registerElement: function (tagName, options) {
+		// console.log(tagName, options);
+		registeredElements[tagName] = options;
+		return options;
+	},
+	createElement: function (tagName) {
+		var node;
+
+		if (registeredElements[tagName]) {
+			var options = registeredElements[tagName];
+
+			console.log('creating custom element ' + tagName);
+			node = Object.create(options.prototype);
+
+			HTMLElement.call(node, tagName);
+
+			node.createdCallback && node.createdCallback();
+		} else {
+			// console.log(tagName, Object.keys(this.registeredElements));
+			node = new HTMLElement(tagName);
+		}
+
+		node.ownerDocument = this;
+
+		return node;
+	},
 	createElementNS: own(ElementNS),
 	createTextNode: own(Text),
 	createComment: own(Comment),
