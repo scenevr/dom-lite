@@ -47,6 +47,7 @@ var voidElements = {
 	parentNode:      null,
 	ownerDocument:   null,
 	childNodes:      null,
+	attributeMap:    null,
 	get nodeValue() {
 		return this.nodeType === 3 || this.nodeType === 8 ? this.data : null
 	},
@@ -286,7 +287,15 @@ Attr.prototype = {
 	get value() { return this.ownerElement.getAttribute(this.name) },
 	set value(val) { this.ownerElement.setAttribute(this.name, val) },
 	toString: function() {
-		return this.name + "=\"" + htmlEscape(this.value) + "\""
+		var v;
+
+		if (this.value) {
+			v = htmlEscape(this.value);
+		} else {
+			v = "";
+		}
+
+		return this.name + "=\"" + v + "\""
 	}
 }
 
@@ -301,6 +310,12 @@ function HTMLElement(tag) {
 	element.nodeName = element.tagName = tag.toUpperCase()
 	element.localName = tag.toLowerCase()
 	element.childNodes = []
+	element.attributeMap = {}
+}
+
+function mappedAttribute (name) {
+	var attributes = ["accept", "accesskey", "action", "align", "alt", "async", "autocomplete", "autofocus", "autoplay", "autosave", "bgcolor", "border", "buffered", "challenge", "charset", "checked", "cite", "class", "code", "codebase", "color", "cols", "colspan", "content", "contenteditable", "contextmenu", "controls", "coords", "data", "data-*", "datetime", "default", "defer", "dir", "dirname", "disabled", "download", "draggable", "dropzone", "enctype", "for", "form", "formaction", "headers", "height", "hidden", "high", "href", "hreflang", "icon", "id", "ismap", "itemprop", "keytype", "kind", "label", "lang", "language", "list", "loop", "low", "manifest", "max", "maxlength", "media", "method", "min", "multiple", "muted", "name", "novalidate", "open", "optimum", "pattern", "ping", "placeholder", "poster", "preload", "radiogroup", "readonly", "rel", "required", "reversed", "rows", "rowspan", "sandbox", "scope", "scoped", "seamless", "selected", "shape", "size", "sizes", "span", "spellcheck", "src", "srcdoc", "srclang", "srcset", "start", "step", "style", "summary", "tabindex", "target", "title", "type", "usemap", "value", "width", "wrap"]
+	return attributes.indexOf(name) !== -1
 }
 
 extendNode(HTMLElement, elementGetters, {
@@ -309,6 +324,8 @@ extendNode(HTMLElement, elementGetters, {
 		, attrs = []
 		, element = this
 		for (key in element) if (key === escapeAttributeName(key) && element.hasAttribute(key))
+			attrs.push(new Attr(element, escapeAttributeName(key)))
+		for (key in element.attributeMap)
 			attrs.push(new Attr(element, escapeAttributeName(key)))
 		return attrs
 	},
@@ -325,15 +342,38 @@ extendNode(HTMLElement, elementGetters, {
 	styleMap: null,
 	hasAttribute: function(name) {
 		name = escapeAttributeName(name)
-		return name != "style" ? hasOwn.call(this, name) :
-		!!(this.styleMap && Object.keys(this.styleMap).length)
+
+		if (typeof this.attributeMap[name] !== "undefined") {
+			return true;
+		}
+
+		if (name !== "style" && hasOwn.call(this, name) && mappedAttribute(name)) {
+			return true;
+		}
+
+		if (name == "style" && this.styleMap) {
+			return !!Object.keys(this.styleMap).length;
+		}
+
+		return false;
+		// return name != "style" ? hasOwn.call(this, name) :
+		// !!(this.styleMap && Object.keys(this.styleMap).length)
 	},
 	getAttribute: function(name) {
 		name = escapeAttributeName(name)
-		return this.hasAttribute(name) ? "" + this[name] : null
+
+		if (!this.hasAttribute(name)) {
+			return null;
+		}
+
+		if (typeof this.attributeMap[name] === "undefined") {
+			return "" + this[name]
+		} else {
+			return "" + this.attributeMap[name]
+		}
 	},
 	setAttribute: function(name, value) {
-		this[escapeAttributeName(name)] = "" + value
+		this.attributeMap[escapeAttributeName(name)] = "" + value
 
 		dispatchMutation(this, {
       type: "attributes",
@@ -343,6 +383,10 @@ extendNode(HTMLElement, elementGetters, {
 	},
 	removeAttribute: function(name) {
 		name = escapeAttributeName(name)
+
+		this.attributeMap[name] = ""
+		delete this.attributeMap[name]
+
 		this[name] = ""
 		delete this[name]
 
@@ -364,6 +408,7 @@ function ElementNS(namespace, tag) {
 	element.namespaceURI = namespace
 	element.nodeName = element.tagName = element.localName = tag
 	element.childNodes = []
+	element.attributeMap = {}
 }
 
 ElementNS.prototype = HTMLElement.prototype
