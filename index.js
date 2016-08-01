@@ -168,6 +168,8 @@ var voidElements = {
 			// TODO:2015-07-24:lauri:update document.body and document.documentElement
 		}
 
+		this.attachedCallback && this.attachedCallback();
+
     dispatchMutation(this, {
       type: "childList",
       addedNodes: [el],
@@ -203,6 +205,7 @@ var voidElements = {
 		, node = this
 		, clone = new node.constructor(node.tagName || node.data)
 		clone.ownerDocument = node.ownerDocument
+		clone.attributeMap = Object.assign({}, this.attributeMap);
 
 		if (node.hasAttribute) {
 			for (key in node) if (node.hasAttribute(key)) clone[key] = node[key].valueOf()
@@ -290,12 +293,12 @@ function Attr(node, name) {
 }
 
 Attr.prototype = {
-	get value() { return this.ownerElement.getAttribute(this.name) },
-	set value(val) { this.ownerElement.setAttribute(this.name, val) },
+	get value() { return HTMLElement.prototype.getAttribute.call(this.ownerElement, this.name) },
+	set value(val) { HTMLElement.prototype.setAttribute(this.ownerElement, this.name, val) },
 	toString: function() {
 		var v;
 
-		if (this.value) {
+		if (typeof this.value === 'string') {
 			v = htmlEscape(this.value);
 		} else {
 			v = "";
@@ -372,6 +375,8 @@ extendNode(HTMLElement, elementGetters, {
 		// !!(this.styleMap && Object.keys(this.styleMap).length)
 	},
 	getAttribute: function(name) {
+		var value;
+
 		name = escapeAttributeName(name)
 
 		if (!this.hasAttribute(name)) {
@@ -379,12 +384,20 @@ extendNode(HTMLElement, elementGetters, {
 		}
 
 		if (typeof this.attributeMap[name] === "undefined") {
-			return "" + this[name]
+			value = this[name];
 		} else {
-			return "" + this.attributeMap[name]
+			value = this.attributeMap[name];
 		}
+
+		return "" + value;
 	},
 	setAttribute: function(name, value) {
+		if (value === null) {
+			// ok
+		} else if (typeof value !== 'string') {
+			throw new Error(name + JSON.stringify(value));
+		}
+
 		this.attributeMap[escapeAttributeName(name)] = "" + value
 
 		if (mappedAttribute(escapeAttributeName(name))) {
@@ -496,7 +509,6 @@ extendNode(Document, elementGetters, {
 	on: EventEmitter.prototype.addListener,
 	emit: EventEmitter.prototype.emit,
 	registerElement: function (tagName, options) {
-		// console.log(tagName, options);
 		registeredElements[tagName] = options;
 		return options;
 	},
@@ -505,15 +517,10 @@ extendNode(Document, elementGetters, {
 
 		if (registeredElements[tagName]) {
 			var options = registeredElements[tagName];
-
-			console.log('creating custom element ' + tagName);
 			node = Object.create(options.prototype);
-
 			HTMLElement.call(node, tagName);
-
 			node.createdCallback && node.createdCallback();
 		} else {
-			// console.log(tagName, Object.keys(this.registeredElements));
 			node = new HTMLElement(tagName);
 		}
 
