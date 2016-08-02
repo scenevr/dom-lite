@@ -14,6 +14,7 @@ var EventEmitter = require('events').EventEmitter;
 
 function makeEmitter (element) {
   EventEmitter.call(element);
+  EventEmitter.setMaxListeners(1024);
   // Object.assign(element, EventEmitter.prototype);
 }
 
@@ -309,7 +310,7 @@ Attr.prototype = {
 }
 
 function escapeAttributeName(name) {
-	name = name.toLowerCase()
+  name = ("" + name).toLowerCase()
 	if (name === "constructor" || name === "attributes") return name.toUpperCase()
 	return name
 }
@@ -330,14 +331,23 @@ function mappedAttribute (name) {
 
 extendNode(HTMLElement, elementGetters, {
 	get attributes() {
+		var keys = {};
+
 		var key
 		, attrs = []
 		, element = this
-		for (key in element) if (key === escapeAttributeName(key) && element.hasAttribute(key))
-			attrs.push(new Attr(element, escapeAttributeName(key)))
-		for (key in element.attributeMap)
-			attrs.push(new Attr(element, escapeAttributeName(key)))
-		return attrs
+
+		for (key in element) if (key === escapeAttributeName(key) && element.hasAttribute(key)) {
+			keys[key] = true;
+		}
+
+		for (key in element.attributeMap) {
+			keys[key] = true;
+		}
+
+		return Object.keys(keys).map((key) => {
+			return new Attr(element, escapeAttributeName(key));
+		});
 	},
 	matches: function(sel) {
 		return selector.matches(this, sel)
