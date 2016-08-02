@@ -14,7 +14,7 @@ var EventEmitter = require('events').EventEmitter;
 
 function makeEmitter (element) {
   EventEmitter.call(element);
-  EventEmitter.setMaxListeners(1024);
+  EventEmitter.prototype.setMaxListeners.call(element, 1024);
   // Object.assign(element, EventEmitter.prototype);
 }
 
