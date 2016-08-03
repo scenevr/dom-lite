@@ -356,6 +356,8 @@ extendNode(HTMLElement, elementGetters, {
 		return selector.closest(this, sel)
 	},
 	addEventListener: EventEmitter.prototype.addListener,
+	emit: EventEmitter.prototype.emit,
+	dispatchEvent: EventEmitter.prototype.emit,
 	classList: { 
 		add: function () {},
 		remove: function () {}
